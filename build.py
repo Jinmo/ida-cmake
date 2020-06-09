@@ -33,10 +33,9 @@ from subprocess import Popen, PIPE
 from distutils.spawn import find_executable
 
 
-def get_build_cmd():
-    return {'posix': 'make', 'nt': 'MSBuild'}[os.name]
-
-def get_cmake_gen(target_version):
+def get_cmake_gen(target_version, custom_gen):
+    if custom_gen:
+        return custom_gen
     if os.name == 'posix':
         return 'Unix Makefiles'
     elif os.name == 'nt':
@@ -46,29 +45,6 @@ def get_cmake_gen(target_version):
         return (gen + ' Win64') if target_version >= (7, 0) else gen
     else:
         assert False
-
-def get_build_solution_arguments(build_dir):
-    build_bin = get_build_cmd()
-    if os.name == 'nt':
-        sln, = glob.glob(os.path.join(build_dir, '*.sln'))
-        sln = os.path.basename(sln)
-        return [build_bin, sln, '/p:Configuration=Release']
-    elif os.name == 'posix':
-        # Speed things up a little.
-        from multiprocessing import cpu_count
-        return [build_bin, '-j%d' % cpu_count()]
-    else:
-        assert False
-
-def get_install_solution_arguments():
-    build_bin = get_build_cmd()
-    if os.name == 'nt':
-        return [build_bin, 'INSTALL.vcxproj', '/p:Configuration=Release']
-    elif os.name == 'posix':
-        return [build_bin, 'install', 'VERBOSE=1']
-    else:
-        assert False
-
 
 if __name__ == '__main__':
     #
@@ -104,6 +80,10 @@ if __name__ == '__main__':
         help='Do not execute install target'
     )
     parser.add_argument(
+        '--gen', default=None, type=str,
+        help='Custom generator for CMake (e.g. Ninja)'
+    )
+    parser.add_argument(
         'cmake_args', default='', type=str, nargs=argparse.REMAINDER,
         help='Additional arguments passed to CMake'
     )
@@ -134,12 +114,9 @@ if __name__ == '__main__':
     # Find tools
     #
     cmake_bin = find_executable('cmake')
-    build_bin = find_executable(get_build_cmd())
     if not cmake_bin:
         print_usage('[-] Unable to find CMake binary')
-    if not build_bin:
-        print_usage('[-] Unable to find build (please use Visual Studio MSBuild CMD or make)')
-
+    
     #
     # Build targets
     #
@@ -155,7 +132,7 @@ if __name__ == '__main__':
         cmake_cmd = [
             cmake_bin,
             '-DIDA_SDK=' + args.ida_sdk,
-            '-G', get_cmake_gen(target_version),
+            '-G', get_cmake_gen(target_version, args.gen.strip()),
             '-DIDA_VERSION={}{:02}'.format(*target_version),
             '-DIDA_BINARY_64=' + ('ON' if target_version >= (7, 0) else 'OFF')
         ]
@@ -179,14 +156,23 @@ if __name__ == '__main__':
             exit()
 
         # Build plugin
-        proc = Popen(get_build_solution_arguments(build_dir), cwd=build_dir)
+        cmake_cmd = [
+            cmake_bin,
+            '--build', '.',
+        ]
+        proc = Popen(cmake_cmd, cwd=build_dir)
         if proc.wait() != 0:
             print('[-] Build failed, giving up.')
             exit()
 
         if not args.skip_install and args.idaq_path:
+            cmake_cmd = [
+                cmake_bin,
+                '--build', '.', '--target', 'install',
+            ]
+
             # Install plugin
-            proc = Popen(get_install_solution_arguments(), cwd=build_dir)
+            proc = Popen(cmake_cmd, cwd=build_dir)
             if proc.wait() != 0:
                 print('[-] Install failed, giving up.')
                 exit()

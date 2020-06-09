@@ -116,7 +116,7 @@ function (add_ida_plugin plugin_name)
         "NO_OBSOLETE_FUNCS"
         "__IDP__")
 
-    target_include_directories(${plugin_name} PUBLIC "${IDA_SDK}/include")
+    target_include_directories(${plugin_name} PUBLIC "${IDA_SDK}/include" "${IDA_INSTALL_DIR}/plugins/hexrays_sdk/include")
 
     if (IDA_BINARY_64)
         target_compile_definitions(${plugin_name} PUBLIC "__X64__")

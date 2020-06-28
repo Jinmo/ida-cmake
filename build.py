@@ -35,7 +35,7 @@ from distutils.spawn import find_executable
 
 def get_cmake_gen(target_version, custom_gen):
     if custom_gen:
-        return custom_gen
+        return custom_gen.strip()
     if os.name == 'posix':
         return 'Unix Makefiles'
     elif os.name == 'nt':
@@ -132,7 +132,7 @@ if __name__ == '__main__':
         cmake_cmd = [
             cmake_bin,
             '-DIDA_SDK=' + args.ida_sdk,
-            '-G', get_cmake_gen(target_version, args.gen.strip()),
+            '-G', get_cmake_gen(target_version, args.gen),
             '-DIDA_VERSION={}{:02}'.format(*target_version),
             '-DIDA_BINARY_64=' + ('ON' if target_version >= (7, 0) else 'OFF')
         ]

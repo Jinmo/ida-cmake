@@ -248,6 +248,6 @@ function (add_ida_qt_plugin plugin_name)
                 PROPERTIES 
                 IMPORTED_LOCATION_RELEASE "${IDA_Qt${qtlib}_LIBRARY}")
         endif ()
-        target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC "Qt5::${qtlib}")
+        target_link_libraries(${plugin_name} PUBLIC "Qt5::${qtlib}")
     endforeach()
 endfunction ()

@@ -10,7 +10,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(ida_qt_libs "Gui;Core;Widgets")
 
 # Locate Qt.
-find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Widgets 5.6 REQUIRED)
 
 # On unixes, we link against the Qt libs that ship with IDA.
 # On Windows with IDA versions >= 7.0, link against .libs in IDA SDK.

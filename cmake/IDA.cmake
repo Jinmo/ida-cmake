@@ -22,15 +22,15 @@
 # THE SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.8)
 cmake_policy(SET CMP0054 NEW)
 
 # =============================================================================================== #
 # Overridable options                                                                             #
 # =============================================================================================== #
 
-set(IDA_BINARY_64         OFF   CACHE BOOL "Build a 64 bit binary (IDA >= 7.0)"             )
-set(IDA_EA_64             OFF   CACHE BOOL "Build for 64 bit IDA (ida64, sizeof(ea_t) == 8)")
+set(IDA_BINARY_64         ON   CACHE BOOL "Build a 64 bit binary (IDA >= 7.0)"             )
+set(IDA_EA_64             ON   CACHE BOOL "Build for 64 bit IDA (ida64, sizeof(ea_t) == 8)")
 set(IDA_SDK               ""    CACHE PATH "Path to IDA SDK"                                )
 set(IDA_INSTALL_DIR       ""    CACHE PATH "Install path of IDA"                            )
 
@@ -58,7 +58,7 @@ if (WIN32)
     endif ()
 
     # On Windows, we use HR's lib files shipped with the SDK.
-    set(IDA_LIB_DIR "${IDA_SDK}/lib/${ida_lib_path_binarch}_win_vc_${ida_lib_path_ea}"
+    set(IDA_LIB_DIR "${IDA_SDK}/lib/${ida_lib_path_binarch}_win_vc_${ida_lib_path_ea}_pro"
         CACHE PATH "IDA SDK library path" FORCE)
 
     message(STATUS "IDA library path: ${IDA_LIB_DIR}")

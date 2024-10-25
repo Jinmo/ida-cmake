@@ -58,7 +58,7 @@ if (WIN32)
     endif ()
 
     # On Windows, we use HR's lib files shipped with the SDK.
-    set(IDA_LIB_DIR "${IDA_SDK}/lib/${ida_lib_path_binarch}_win_vc_${ida_lib_path_ea}_pro"
+    set(IDA_LIB_DIR "${IDA_SDK}/lib/${ida_lib_path_binarch}_win_vc_${ida_lib_path_ea}"
         CACHE PATH "IDA SDK library path" FORCE)
 
     message(STATUS "IDA library path: ${IDA_LIB_DIR}")

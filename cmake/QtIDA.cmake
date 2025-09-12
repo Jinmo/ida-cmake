@@ -10,7 +10,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(ida_qt_libs "Gui;Core;Widgets")
 
 # Locate Qt.
-find_package(Qt5Widgets 5.6 REQUIRED)
+find_package(Qt6Widgets 6.8 REQUIRED)
 
 # On unixes, we link against the Qt libs that ship with IDA.
 # On Windows with IDA versions >= 7.0, link against .libs in IDA SDK.
@@ -20,9 +20,9 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Lin
     if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         set(ida_qt_glob_path "${IDA_INSTALL_DIR}/../Frameworks/Qt@QTLIB@")
     elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        set(ida_qt_glob_path "${IDA_INSTALL_DIR}/libQt5@QTLIB@.so*")
+        set(ida_qt_glob_path "${IDA_INSTALL_DIR}/libQt6@QTLIB@.so*")
     elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        set(ida_qt_glob_path "${IDA_SDK}/lib/x64_win_qt/Qt5@QTLIB@.lib")
+        set(ida_qt_glob_path "${IDA_SDK}/lib/x64_win_qt/Qt6@QTLIB@.lib")
     endif ()
 
     foreach(cur_lib ${ida_qt_libs})
@@ -45,7 +45,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Lin
 
     foreach (cur_lib ${ida_qt_libs})
         set_target_properties(
-            "Qt5::${cur_lib}"
+            "Qt6::${cur_lib}"
             PROPERTIES 
             ${lib_property} "${IDA_Qt${cur_lib}_LIBRARY}")
     endforeach()

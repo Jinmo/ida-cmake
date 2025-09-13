@@ -22,7 +22,7 @@
 # THE SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.21)
 cmake_policy(SET CMP0054 NEW)
 
 # =============================================================================================== #
@@ -227,10 +227,10 @@ function (add_ida_qt_plugin plugin_name)
     endforeach ()
 
     # Compile UI files.
-    QT5_WRAP_UI(form_headers ${ui_sources})
+    QT6_WRAP_UI(form_headers ${ui_sources})
 
     # Compile resources.
-    QT5_ADD_RESOURCES(rsrc_headers ${rsrc_sources})
+    QT6_ADD_RESOURCES(rsrc_headers ${rsrc_sources})
 
     # Add plugin.
     add_ida_plugin(${plugin_name} ${non_ui_sources} ${form_headers} ${rsrc_headers})
@@ -240,10 +240,10 @@ function (add_ida_qt_plugin plugin_name)
     foreach (qtlib Core;Gui;Widgets)
         if (DEFINED IDA_QtCore_LIBRARY)
             set_target_properties(
-                "Qt5::${qtlib}"
+                "Qt6::${qtlib}"
                 PROPERTIES 
                 IMPORTED_LOCATION_RELEASE "${IDA_Qt${qtlib}_LIBRARY}")
         endif ()
-        target_link_libraries(${plugin_name} PUBLIC "Qt5::${qtlib}")
+        target_link_libraries(${plugin_name} PUBLIC "Qt6::${qtlib}")
     endforeach()
 endfunction ()

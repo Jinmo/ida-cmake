@@ -27,9 +27,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import errno
 import argparse
-import glob
 
-from subprocess import Popen, PIPE
+from subprocess import Popen
 from distutils.spawn import find_executable
 
 

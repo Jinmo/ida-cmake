@@ -1,24 +1,29 @@
-IDA plugin CMake build-script
-=============================
+# IDA plugin CMake build-script
 
-This repository holds CMake build scripts and a Python helper allowing 
+This repository holds **CMake** build scripts and a Python helper allowing
 compilation of C++ IDA plugins for Windows, macOS and Linux without
 much user effort.
 
-## Simple plugin example usage:
+Targets **IDA SDK 9.4** (IDA 9.x, x64 and arm64). Requires CMake >= 3.21 and,
+for `build.py`, Python 3.13+. Architecture (x64 vs arm64) is detected at
+configure time from the toolchain; pass `-DIDA_ARCH=` only to override.
 
-##### Create plugin repo
+## Simple plugin example usage
+
+### Create plugin repo
+
 ```bash
 git init myplugin
 cd myplugin
-git submodule add https://github.com/zyantific/ida-cmake.git ida-cmake
+git submodule add https://github.com/jinmo/ida-cmake.git ida-cmake
 mkdir src
 touch src/myplugin.cpp CMakeLists.txt
 ```
 
-##### CMakeLists.txt
+### CMakeLists.txt
+
 ```CMake
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.21)
 project(myplugin)
 
 include("ida-cmake/cmake/IDA.cmake")
@@ -27,49 +32,70 @@ set(sources "src/myplugin.cpp")
 add_ida_plugin(${CMAKE_PROJECT_NAME} ${sources})
 ```
 
-##### src/myplugin.cpp
+Qt-based plugins additionally `include("ida-cmake/cmake/QtIDA.cmake")` before
+`IDA.cmake` and use `add_ida_qt_plugin()`. On Windows this links against the
+Qt import libraries shipped in the SDK (`<arch>_win_qt`), which is also why
+the build type must be `Release`.
+
+### src/myplugin.cpp
+
 ```cpp
 #include <ida.hpp>
 #include <idp.hpp>
 #include <loader.hpp>
 
-/**
- * @brief   Initialization callback for IDA.
- * @return  A @c PLUGIN_ constant from loader.hpp.
- */
-int idaapi init()
+static plugmod_t* idaapi init()
 {
-    msg("%s", "Hello, IDA plugin world!\n");
+    msg("Hello, IDA plugin world!\n");
     return PLUGIN_KEEP;
 }
 
-/**
- * @brief   Run callback for IDA.
- */
-void idaapi run(int /*arg*/) {}
+static bool idaapi run(size_t /*arg*/) { return true; }
 
-/**
- * @brief   Shutdown callback for IDA.
- */
-void idaapi term() {}
+static void idaapi term() {}
 
 plugin_t PLUGIN =
 {
     IDP_INTERFACE_VERSION,
-    0,
-    &init,
-    &term,
-    &run,
-    "My plugin name",
-    "My plugin description",
-    "My plugin menu entry text",
-    nullptr, // plugin hotkey, e.g. "Ctrl-Shift-A"
+    0,                       // flags
+    init,
+    term,
+    run,
+    "My plugin description", // comment
+    "My plugin help",        // help
+    "My plugin name",        // wanted_name (menu entry text)
+    nullptr,                 // wanted_hotkey, e.g. "Ctrl-Shift-A"
 };
 ```
 
-##### Building and installing the plugin for IDA 6.95 on macOS
+### Building and installing the plugin
+
+Run from an environment where your compiler is available (on Windows: the
+x64 or ARM64 Native Tools prompt of Visual Studio — the prompt's target
+architecture decides what gets built):
+
 ```bash
-ida-cmake/build.py -i <ida-sdk-path> -t 6.95 \
-    --idaq-path '/Applications/IDA Pro 6.95.app/Contents/MacOS/'
+ida-cmake/build.py -i <ida-sdk-path> --ida-install-dir <ida-install-dir>
 ```
-Substitute `<ida-sdks-path>` with a directory of the IDA SDK corresponding to your IDA version.
+
+Substitute `<ida-sdk-path>` with the IDA SDK 9.4 directory (the one holding
+`include/` and `lib/`) and `<ida-install-dir>` with your IDA installation.
+Extra arguments after the options are passed to CMake verbatim.
+
+## Contributors
+
+* [Jinmo][02]
+* [Blue DeviL // SCT][03]
+
+## Authors
+
+* [Joel Höner][01]
+
+## License
+
+[MIT][04]
+
+[01]: https://github.com/athre0z
+[02]: https://github.com/jinmo
+[03]: https://github.com/blue-devil
+[04]: ./LICENSE

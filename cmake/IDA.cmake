@@ -25,23 +25,26 @@
 cmake_minimum_required(VERSION 3.21)
 cmake_policy(SET CMP0054 NEW)
 
-# =============================================================================================== #
-# Overridable options                                                                             #
-# =============================================================================================== #
+# ============================================================================ #
+# Overridable options                                                          #
+# ============================================================================ #
 
-set(IDA_BINARY_64         ON   CACHE BOOL "Build a 64 bit binary (IDA >= 7.0)"             )
-set(IDA_EA_64             ON   CACHE BOOL "Build for 64 bit IDA (ida64, sizeof(ea_t) == 8)")
-set(IDA_SDK               ""    CACHE PATH "Path to IDA SDK"                                )
-set(IDA_INSTALL_DIR       ""    CACHE PATH "Install path of IDA"                            )
+set(IDA_BINARY_64   ON   CACHE BOOL "Build a 64 bit binary (IDA >= 7.0)"       )
+set(IDA_EA_64       ON   CACHE BOOL "Build for 64 bit IDA (ida64, sizeof(ea_t) == 8)")
+set(IDA_SDK         ""   CACHE PATH "Path to IDA SDK"                          )
+set(IDA_INSTALL_DIR ""   CACHE PATH "Install path of IDA"                      )
 
 set(ida_libraries "")
 
-# =============================================================================================== #
-# General preparation                                                                             #
-# =============================================================================================== #
+# ============================================================================ #
+# General preparation                                                          #
+# ============================================================================ #
 
 # We need to save our path here so we have it available in functions later on.
 set(ida_cmakelist_path ${CMAKE_CURRENT_LIST_DIR})
+
+# Target architecture / OS detection for the SDK's directory layout.
+include("${CMAKE_CURRENT_LIST_DIR}/IDAArch.cmake")
 
 # Library dependencies and include pathes
 if (WIN32)
@@ -51,20 +54,19 @@ if (WIN32)
         set(ida_lib_path_ea "32")
     endif ()
 
-    if (IDA_BINARY_64)
-        set(ida_lib_path_binarch "x64")
-    else ()
-        set(ida_lib_path_binarch "x64")
-    endif ()
-
-    # On Windows, we use HR's lib files shipped with the SDK.
-    set(IDA_LIB_DIR "${IDA_SDK}/lib/${ida_lib_path_binarch}_win_vc_${ida_lib_path_ea}"
-        CACHE PATH "IDA SDK library path" FORCE)
+    # On Windows, we use HR's lib files shipped with the SDK. The directory name
+    # follows the target (x64_win_64, arm64_win_64, x86_win_32_s, ...) and is
+    # resolved at configure time rather than hardcoded. No FORCE, so an explicit
+    # -DIDA_LIB_DIR= still wins.
+    ida_sdk_lib_dir(ida_detected_lib_dir "${ida_lib_path_ea}")
+    set(IDA_LIB_DIR "${ida_detected_lib_dir}" CACHE PATH "IDA SDK library path")
 
     message(STATUS "IDA library path: ${IDA_LIB_DIR}")
 
-    if (NOT EXISTS ${IDA_LIB_DIR})
-        set(IDA_LIB_DIR NOTFOUND)
+    if (NOT IDA_LIB_DIR OR NOT EXISTS "${IDA_LIB_DIR}")
+        message(FATAL_ERROR
+            "No IDA SDK library directory for ${IDA_ARCH}_${IDA_OS}_${ida_lib_path_ea}. "
+            "Check IDA_SDK (currently '${IDA_SDK}'), or pass -DIDA_LIB_DIR= explicitly.")
     endif ()
 
     find_library(IDA_IDA_LIBRARY NAMES "ida" PATHS ${IDA_LIB_DIR} REQUIRED)
@@ -79,16 +81,16 @@ elseif (UNIX)
         set(CMAKE_CXX_FLAGS "-m32" CACHE STRING "C++ compiler flags" FORCE)
     endif ()
 
-    # On unixoid platforms, we link against IDA directly.
+    # On *nix platforms, we link against IDA directly.
     find_library(IDA_IDA_LIBRARY NAMES "ida" PATHS ${IDA_INSTALL_DIR} REQUIRED)
     list(APPEND ida_libraries ${IDA_IDA_LIBRARY})
 endif ()
 
 set(ida_libraries ${ida_libraries} CACHE INTERNAL "IDA libraries" FORCE)
 
-# =============================================================================================== #
-# Functions for adding IDA plugin targets                                                         #
-# =============================================================================================== #
+# ============================================================================ #
+# Functions for adding IDA plugin targets                                      #
+# ============================================================================ #
 
 function (add_ida_plugin plugin_name)
     set(sources ${ARGV})
@@ -205,9 +207,9 @@ function (add_ida_plugin plugin_name)
     endif ()
 endfunction (add_ida_plugin)
 
-# =============================================================================================== #
-# Functions for adding IDA plugin targets with Qt support                                         #
-# =============================================================================================== #
+# ============================================================================ #
+# Functions for adding IDA plugin targets with Qt support                      #
+# ============================================================================ #
 
 function (add_ida_qt_plugin plugin_name)
     set(sources ${ARGV})

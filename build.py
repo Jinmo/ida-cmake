@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
     The MIT License (MIT)
 
     Copyright (c) 2017 Joel Hoener <athre0z@zyantific.com>
-    
+
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
     in the Software without restriction, including without limitation the rights
@@ -22,158 +22,77 @@
     SOFTWARE.
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+# Helper for building C++ IDA plugins against IDA SDK 9.4.
+# Requires Python 3.13+ and CMake >= 3.21.
 
-import os
-import errno
 import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
-from subprocess import Popen
-from distutils.spawn import find_executable
+
+def run(cmd: list[str], cwd: Path) -> None:
+    print(" ".join(f"'{x}'" if " " in x else x for x in cmd))
+    # check=False: the exit code is inspected here, with a friendlier message
+    # than a CalledProcessError traceback.
+    if subprocess.run(cmd, cwd=cwd, check=False).returncode != 0:
+        sys.exit("[-] Command failed, giving up.")
 
 
-def get_cmake_gen(target_version, custom_gen):
-    if custom_gen:
-        return custom_gen.strip()
-    if os.name == 'posix':
-        return 'Unix Makefiles'
-    elif os.name == 'nt':
-        gen = 'Visual Studio ' + (
-            '10' if target_version[0] <= 6 and target_version[1] <= 8 else '14'
-        )
-        return (gen + ' Win64') if target_version >= (7, 0) else gen
-    else:
-        assert False
-
-if __name__ == '__main__':
-    #
-    # Parse arguments
-    #
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Build script compiling and installing the plugin.'
-    )
-    
-    target_args = parser.add_argument_group('target configuration')
-    target_args.add_argument(
-        '--ida-sdk', '-i', type=str, required=True,
-        help='Path to the IDA SDK'
-    )
-    target_args.add_argument(
-        '--target-version', '-t', required=True,
-        help='IDA versions to build for (e.g. 6.9).'
-    )
-    target_args.add_argument(
-        '--idaq-path', type=str, required=False,
-        help='Path with idaq binary, used for installing the plugin. '
-             'On unix-like platforms, also required for linkage.'
-
-    )
-    target_args.add_argument(
-        '--ea', required=False, choices=[32, 64], type=int,
-        help='The IDA variant (ida/ida64, sizeof(ea_t) == 4/8) to build for. '
-             'If omitted, build both.'
-    )
-
-    parser.add_argument(
-        '--skip-install', action='store_true', default=False,
-        help='Do not execute install target'
+        description="Configure, build and install an IDA plugin (IDA SDK 9.4)."
     )
     parser.add_argument(
-        '--gen', default=None, type=str,
-        help='Custom generator for CMake (e.g. Ninja)'
-    )
+        "--ida-sdk", "-i", required=True,
+        help="Path to the IDA SDK (the directory holding include/ and lib/)")
     parser.add_argument(
-        'cmake_args', default='', type=str, nargs=argparse.REMAINDER,
-        help='Additional arguments passed to CMake'
-    )
+        "--ida-install-dir", "--idaq-path", dest="ida_install_dir",
+        help="IDA installation directory; used for installing the plugin, "
+             "and required on Linux/macOS for linking against IDA's own libraries")
+    parser.add_argument(
+        "--build-dir", default="build", help="Build directory (default: build)")
+    parser.add_argument(
+        "--gen", "-G", help="CMake generator (default: Ninja if available)")
+    parser.add_argument(
+        "--skip-install", action="store_true", help="Do not run the install step")
+    parser.add_argument(
+        "cmake_args", nargs=argparse.REMAINDER,
+        help="Additional arguments passed to CMake verbatim")
     args = parser.parse_args()
 
-    def print_usage(error=None):
-        parser.print_usage()
-        if error:
-            print(error)
-        exit()
+    cmake = shutil.which("cmake")
+    if not cmake:
+        sys.exit("[-] Unable to find CMake binary")
+    if sys.platform != "win32" and not args.ida_install_dir:
+        sys.exit("[-] On Linux/macOS, --ida-install-dir is required.")
 
-    # Parse target version
-    target_version = args.target_version.strip().split('.')
-    try:
-        target_version = int(target_version[0]), int(target_version[1])
-    except (ValueError, IndexError):
-        print_usage('[-] Invalid version format, expected something like "6.5"')
+    build_dir = Path(args.build_dir)
+    build_dir.mkdir(parents=True, exist_ok=True)
 
-    # Supported platform?
-    if os.name not in ('nt', 'posix'):
-        print('[-] Unsupported platform')
+    # Release is required: QtIDA.cmake redirects the Qt6::* targets to IDA's
+    # own Qt libraries via *_RELEASE properties only.
+    cmd = [
+        cmake, str(Path.cwd()),
+        "-DCMAKE_BUILD_TYPE=Release",
+        f"-DIDA_SDK={args.ida_sdk}",
+    ]
+    gen = args.gen or ("Ninja" if shutil.which("ninja") else None)
+    if gen:
+        cmd += ["-G", gen]
+    if args.ida_install_dir:
+        cmd += [f"-DIDA_INSTALL_DIR={args.ida_install_dir}",
+                f"-DCMAKE_INSTALL_PREFIX={args.ida_install_dir}"]
+    cmd += args.cmake_args
 
-    # Unix specific sanity checks
-    if os.name == 'posix' and not args.idaq_path:
-        print_usage('[-] On unix-like platforms, --idaq-path is required.')
+    run(cmd, cwd=build_dir)
+    run([cmake, "--build", ".", "--parallel"], cwd=build_dir)
+    if not args.skip_install and args.ida_install_dir:
+        run([cmake, "--build", ".", "--target", "install"], cwd=build_dir)
 
-    #
-    # Find tools
-    #
-    cmake_bin = find_executable('cmake')
-    if not cmake_bin:
-        print_usage('[-] Unable to find CMake binary')
-    
-    #
-    # Build targets
-    #
-    for ea in (args.ea,) if args.ea else (32, 64):
-        build_dir = 'build-{}.{}-{}'.format(*(target_version + (ea,)))
-        try:
-            os.mkdir(build_dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+    print("[+] Done!")
 
-        # Run cmake
-        cmake_cmd = [
-            cmake_bin,
-            '-DIDA_SDK=' + args.ida_sdk,
-            '-G', get_cmake_gen(target_version, args.gen),
-            '-DIDA_VERSION={}{:02}'.format(*target_version),
-            '-DIDA_BINARY_64=' + ('ON' if target_version >= (7, 0) else 'OFF')
-        ]
 
-        if args.idaq_path:
-            cmake_cmd.append('-DIDA_INSTALL_DIR=' + args.idaq_path)
-            cmake_cmd.append('-DCMAKE_INSTALL_PREFIX=' + args.idaq_path)
-
-        if ea == 64:
-            cmake_cmd.append('-DIDA_EA_64=TRUE')
-
-        cmake_cmd += args.cmake_args
-        cmake_cmd.append('..')
-
-        print('CMake command:')
-        print(' '.join("'%s'" % x if ' ' in x else x for x in cmake_cmd))
-
-        proc = Popen(cmake_cmd, cwd=build_dir)
-        if proc.wait() != 0:
-            print('[-] CMake failed, giving up.')
-            exit()
-
-        # Build plugin
-        cmake_cmd = [
-            cmake_bin,
-            '--build', '.',
-        ]
-        proc = Popen(cmake_cmd, cwd=build_dir)
-        if proc.wait() != 0:
-            print('[-] Build failed, giving up.')
-            exit()
-
-        if not args.skip_install and args.idaq_path:
-            cmake_cmd = [
-                cmake_bin,
-                '--build', '.', '--target', 'install',
-            ]
-
-            # Install plugin
-            proc = Popen(cmake_cmd, cwd=build_dir)
-            if proc.wait() != 0:
-                print('[-] Install failed, giving up.')
-                exit()
-
-    print('[+] Done!')
+if __name__ == "__main__":
+    main()
